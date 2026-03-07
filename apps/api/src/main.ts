@@ -14,7 +14,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('API_PORT', 4000);
+  const port = configService.get<number>('PORT', 4000);
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
 
   // Security
@@ -23,7 +23,7 @@ async function bootstrap() {
 
   // CORS — cho phép Next.js frontend
   app.enableCors({
-    origin: configService.get('NEXT_PUBLIC_API_URL', 'http://localhost:3000'),
+    origin: configService.get('FRONTEND_URL', 'http://localhost:3000'),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
