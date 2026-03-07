@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // Standalone output chỉ dùng khi build Docker (DOCKER_BUILD=true)
   ...(process.env.DOCKER_BUILD === 'true' ? { output: 'standalone' } : {}),
 
