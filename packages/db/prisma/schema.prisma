@@ -1,0 +1,1017 @@
+// FuviAI CRM — Prisma Schema
+// Sprint 1: Auth & Multi-tenancy | Sprint 2: Contact Management | Sprint 3: Pipeline & Deals | Sprint 4: Activity & Calendar | Sprint 5: FuviBot AI | Sprint 6: Email Marketing | Sprint 7: Zalo OA | Sprint 8: Automation Engine | Sprint 9: Dashboard | Sprint 10: Team & Permissions | Sprint 11: Billing & Subscription | Sprint 13: Notifications
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// ENUMS
+// =====================
+
+enum Plan {
+  STARTER
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ContactStatus {
+  LEAD
+  PROSPECT
+  CUSTOMER
+  INACTIVE
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  TASK
+}
+
+enum ActivityStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
+enum CampaignStatus {
+  DRAFT      // đang soạn
+  SCHEDULED  // đã lên lịch gửi
+  SENDING    // đang gửi
+  SENT       // đã gửi xong
+  FAILED     // lỗi
+}
+
+enum RecipientStatus {
+  PENDING  // chờ gửi
+  SENT     // đã gửi
+  OPENED   // đã mở
+  CLICKED  // đã click link
+  BOUNCED  // email bị trả về
+  FAILED   // lỗi gửi
+}
+
+enum ConversationChannel {
+  ZALO   // Zalo OA
+  EMAIL  // Email
+  SMS    // SMS
+  WEB    // Web live chat
+}
+
+enum MessageDirection {
+  INBOUND   // Tin từ khách hàng
+  OUTBOUND  // Tin từ nhân viên / bot
+}
+
+enum MessageStatus {
+  SENDING   // Đang gửi
+  SENT      // Đã gửi
+  DELIVERED // Đã giao
+  READ      // Đã đọc
+  FAILED    // Thất bại
+}
+
+// =====================
+// AUTOMATION ENGINE ENUMS (Sprint 8)
+// =====================
+
+enum TriggerType {
+  CONTACT_CREATED       // Khi tạo contact mới
+  CONTACT_STATUS_CHANGED // Khi đổi status contact
+  DEAL_CREATED          // Khi tạo deal mới
+  DEAL_STAGE_CHANGED    // Khi deal chuyển stage
+  DEAL_WON              // Khi deal thắng
+  DEAL_LOST             // Khi deal thua
+  CONVERSATION_RECEIVED // Khi nhận tin nhắn inbound
+  ACTIVITY_DUE          // Khi activity đến hạn
+  MANUAL                // Kích hoạt thủ công
+}
+
+enum ActionType {
+  SEND_EMAIL            // Gửi email qua template
+  SEND_ZALO             // Gửi tin nhắn Zalo OA
+  CREATE_ACTIVITY       // Tạo activity (CALL/TASK/...)
+  UPDATE_CONTACT_STATUS // Đổi status contact
+  UPDATE_DEAL_STAGE     // Chuyển deal sang stage khác
+  ASSIGN_TO_USER        // Giao việc cho nhân viên
+  ADD_TAG               // Gắn tag cho contact
+  SEND_WEBHOOK          // Gọi external webhook
+  WAIT                  // Chờ N ngày/giờ trước action tiếp theo
+}
+
+enum WorkflowStatus {
+  ACTIVE    // Đang hoạt động
+  INACTIVE  // Tạm dừng
+  DRAFT     // Đang soạn, chưa publish
+}
+
+enum WorkflowRunStatus {
+  PENDING    // Chờ chạy
+  RUNNING    // Đang chạy
+  COMPLETED  // Hoàn thành
+  FAILED     // Lỗi
+  CANCELLED  // Đã hủy
+}
+
+// =====================
+// AUDIT LOG ENUMS (Sprint 15)
+// =====================
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  SEND          // Email / Zalo gửi đi
+  TRIGGER       // Automation trigger
+}
+
+// =====================
+// NOTIFICATION ENUMS (Sprint 13)
+// =====================
+
+enum NotificationType {
+  DEAL_WON              // Deal thắng
+  DEAL_LOST             // Deal thua
+  DEAL_STAGE_CHANGED    // Deal chuyển stage
+  NEW_MESSAGE           // Tin nhắn mới từ khách
+  ACTIVITY_DUE          // Activity sắp đến hạn
+  ACTIVITY_ASSIGNED     // Activity được giao cho bạn
+  CONTACT_ASSIGNED      // Contact được giao cho bạn
+  WORKFLOW_FAILED       // Workflow automation lỗi
+  TEAM_MEMBER_JOINED    // Thành viên mới tham gia
+  BILLING_ALERT         // Cảnh báo billing (usage cao, hết hạn)
+  SYSTEM               // Thông báo hệ thống
+}
+
+// =====================
+// MODELS
+// =====================
+
+/// Tenant root — mỗi Organization là 1 tenant độc lập
+model Organization {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique // dùng cho subdomain/URL
+  plan      Plan      @default(STARTER)
+  logoUrl   String?
+  website   String?
+  phone     String?
+  address   String?
+  timezone  String    @default("Asia/Ho_Chi_Minh")
+  locale    String    @default("vi")
+  settings  Json      @default("{}") // cấu hình tùy chỉnh per-tenant
+
+  // Audit fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  users          User[]
+  refreshTokens  RefreshToken[]
+  contacts       Contact[]
+  tags           Tag[]
+  pipelines      Pipeline[]
+  deals          Deal[]
+  activities     Activity[]
+  notes          Note[]
+  emailTemplates  EmailTemplate[]
+  emailCampaigns  EmailCampaign[]
+  conversations   Conversation[]
+  workflows       WorkflowAutomation[]
+  teamInvitations TeamInvitation[]
+  subscription    Subscription?
+  billingHistory  BillingHistory[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  apiKeys           ApiKey[]
+  webhookEndpoints  WebhookEndpoint[]
+  webhookDeliveries WebhookDelivery[]
+
+  @@map("organizations")
+}
+
+/// User — thuộc 1 Organization, có role trong tổ chức đó
+model User {
+  id             String     @id @default(cuid())
+  organizationId String
+  email          String
+  passwordHash   String
+  firstName      String
+  lastName       String
+  avatarUrl      String?
+  phone          String?
+  role           UserRole   @default(MEMBER)
+  status         UserStatus @default(ACTIVE)
+  lastLoginAt    DateTime?
+  emailVerifiedAt DateTime?
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization            Organization   @relation(fields: [organizationId], references: [id])
+  refreshTokens           RefreshToken[]
+  assignedDeals           Deal[]         @relation("AssignedDeals")
+  assignedActivities      Activity[]     @relation("AssignedActivities")
+  assignedConversations   Conversation[] @relation("AssignedConversations")
+  sentMessages            Message[]      @relation("SentMessages")
+  sentInvitations         TeamInvitation[] @relation("SentInvitations")
+  notifications           Notification[]    @relation("UserNotifications")
+  auditLogs               AuditLog[]        @relation("UserAuditLogs")
+  createdApiKeys          ApiKey[]          @relation("CreatedApiKeys")
+  createdWebhooks         WebhookEndpoint[] @relation("CreatedWebhooks")
+
+  // Email unique per organization (multi-tenancy: email có thể trùng giữa các org)
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([email])
+  @@map("users")
+}
+
+/// RefreshToken — lưu token để có thể revoke
+model RefreshToken {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  token          String    @unique // hashed token
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  userAgent      String?
+  ipAddress      String?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// =====================
+// CONTACT MANAGEMENT (Sprint 2)
+// =====================
+
+/// Contact — khách hàng/lead của tổ chức
+model Contact {
+  id             String        @id @default(cuid())
+  organizationId String
+  firstName      String
+  lastName       String?
+  email          String?
+  phone          String?
+  company        String?
+  position       String?
+  address        String?
+  website        String?
+  status         ContactStatus @default(LEAD)
+  aiScore        Float?
+  customFields   Json          @default("{}")
+  notes          String?       @db.Text
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization        Organization             @relation(fields: [organizationId], references: [id])
+  tags                ContactTag[]
+  deals               Deal[]
+  activities          Activity[]
+  notes               Note[]
+  emailRecipients     EmailCampaignRecipient[]
+  conversations       Conversation[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, email])
+  @@map("contacts")
+}
+
+/// Tag — nhãn dùng để phân loại contacts
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  color          String   @default("#6B7280")
+
+  // Audit fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contacts     ContactTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+/// ContactTag — bảng pivot M2M giữa Contact và Tag
+model ContactTag {
+  contactId String
+  tagId     String
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@map("contact_tags")
+}
+
+// =====================
+// PIPELINE & DEALS (Sprint 3)
+// =====================
+
+/// Pipeline — quy trình bán hàng của tổ chức
+model Pipeline {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  isDefault      Boolean   @default(false)
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+
+  // Relations
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  stages       PipelineStage[]
+  deals        Deal[]
+
+  @@index([organizationId])
+  @@map("pipelines")
+}
+
+/// PipelineStage — giai đoạn trong pipeline (Lead → Proposal → Won/Lost)
+model PipelineStage {
+  id             String  @id @default(cuid())
+  organizationId String
+  pipelineId     String
+  name           String
+  order          Int
+  color          String  @default("#6B7280")
+  probability    Int     @default(0) // 0-100%
+
+  // Audit fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  pipeline     Pipeline     @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals        Deal[]
+
+  @@index([pipelineId])
+  @@index([organizationId, pipelineId])
+  @@map("pipeline_stages")
+}
+
+/// Deal — cơ hội bán hàng, gắn với Contact và PipelineStage
+model Deal {
+  id               String     @id @default(cuid())
+  organizationId   String
+  title            String
+  value            Float?
+  currency         String     @default("VND")
+  status           DealStatus @default(OPEN)
+  pipelineId       String
+  stageId          String
+  contactId        String?
+  assignedToId     String?
+  expectedCloseDate DateTime?
+  closedAt         DateTime?
+  notes            String?    @db.Text
+  customFields     Json       @default("{}")
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  pipeline     Pipeline      @relation(fields: [pipelineId], references: [id])
+  stage        PipelineStage @relation(fields: [stageId], references: [id])
+  contact      Contact?      @relation(fields: [contactId], references: [id])
+  assignedTo   User?         @relation("AssignedDeals", fields: [assignedToId], references: [id])
+  activities   Activity[]
+  notes        Note[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, stageId])
+  @@index([organizationId, contactId])
+  @@map("deals")
+}
+
+// =====================
+// ACTIVITY & CALENDAR (Sprint 4)
+// =====================
+
+/// Activity — hoạt động bán hàng (CALL/EMAIL/MEETING/TASK) gắn với Contact/Deal
+model Activity {
+  id             String         @id @default(cuid())
+  organizationId String
+  type           ActivityType
+  status         ActivityStatus @default(PENDING)
+  title          String
+  description    String?        @db.Text
+  dueDate        DateTime?
+  completedAt    DateTime?
+  contactId      String?
+  dealId         String?
+  assignedToId   String?
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contact      Contact?     @relation(fields: [contactId], references: [id])
+  deal         Deal?        @relation(fields: [dealId], references: [id])
+  assignedTo   User?        @relation("AssignedActivities", fields: [assignedToId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, type])
+  @@index([organizationId, status])
+  @@index([organizationId, contactId])
+  @@index([organizationId, dealId])
+  @@index([organizationId, dueDate])
+  @@map("activities")
+}
+
+/// Note — ghi chú tự do gắn với Contact/Deal
+model Note {
+  id             String  @id @default(cuid())
+  organizationId String
+  content        String  @db.Text
+  contactId      String?
+  dealId         String?
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contact      Contact?     @relation(fields: [contactId], references: [id])
+  deal         Deal?        @relation(fields: [dealId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, contactId])
+  @@index([organizationId, dealId])
+  @@map("notes")
+}
+
+/// EmailTemplate — mẫu email tái sử dụng
+model EmailTemplate {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String              // Tên template
+  subject        String              // Tiêu đề email
+  body           String  @db.Text   // Nội dung HTML/text
+  previewText    String?             // Text hiển thị trong preview email
+  isDefault      Boolean @default(false)
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  campaigns    EmailCampaign[]
+
+  @@index([organizationId])
+  @@map("email_templates")
+}
+
+/// EmailCampaign — chiến dịch email gửi hàng loạt
+model EmailCampaign {
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String                           // Tên chiến dịch
+  subject        String                           // Tiêu đề email
+  body           String         @db.Text          // Nội dung
+  previewText    String?
+  status         CampaignStatus @default(DRAFT)
+  templateId     String?                          // Template sử dụng (optional)
+  scheduledAt    DateTime?                        // Thời gian lên lịch gửi
+  sentAt         DateTime?                        // Thời gian thực sự gửi
+
+  // Filter người nhận — null = gửi tất cả
+  filterStatus   ContactStatus? // Lọc theo trạng thái contact
+  filterTagId    String?        // Lọc theo tag
+
+  // Stats (denormalized để query nhanh)
+  totalRecipients Int @default(0)
+  totalSent       Int @default(0)
+  totalOpened     Int @default(0)
+  totalClicked    Int @default(0)
+  totalBounced    Int @default(0)
+  totalFailed     Int @default(0)
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization Organization            @relation(fields: [organizationId], references: [id])
+  template     EmailTemplate?          @relation(fields: [templateId], references: [id])
+  recipients   EmailCampaignRecipient[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("email_campaigns")
+}
+
+/// EmailCampaignRecipient — bản ghi gửi email cho từng contact
+model EmailCampaignRecipient {
+  id         String          @id @default(cuid())
+  campaignId String
+  contactId  String
+  email      String          // Snapshot email tại thời điểm gửi
+  status     RecipientStatus @default(PENDING)
+  sentAt     DateTime?
+  openedAt   DateTime?
+  clickedAt  DateTime?
+  error      String?         // Lý do lỗi nếu có
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact       @relation(fields: [contactId], references: [id])
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([campaignId, status])
+  @@map("email_campaign_recipients")
+}
+
+/// Conversation — thread nhắn tin giữa tổ chức và 1 contact (Zalo/Email/SMS)
+model Conversation {
+  id             String              @id @default(cuid())
+  organizationId String
+  contactId      String
+  channel        ConversationChannel @default(ZALO)
+
+  // Zalo OA specific
+  zaloUserId     String?  // Zalo user ID của khách
+  zaloOaId       String?  // Zalo OA ID
+
+  // State
+  isOpen         Boolean  @default(true)   // false = đã đóng/resolved
+  unreadCount    Int      @default(0)
+  lastMessageAt  DateTime?
+  lastMessagePreview String?              // Preview tin nhắn cuối để hiển thị trong list
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  assignedToId String?                    // Nhân viên phụ trách
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contact      Contact      @relation(fields: [contactId], references: [id])
+  assignedTo   User?        @relation("AssignedConversations", fields: [assignedToId], references: [id])
+  messages     Message[]
+
+  @@index([organizationId])
+  @@index([organizationId, channel])
+  @@index([organizationId, isOpen])
+  @@index([organizationId, contactId])
+  @@index([organizationId, lastMessageAt])
+  @@map("conversations")
+}
+
+/// Message — tin nhắn trong một Conversation
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+  organizationId String
+  direction      MessageDirection
+  status         MessageStatus    @default(SENT)
+  content        String           @db.Text
+  messageType    String           @default("text")  // text | image | file | sticker
+  attachmentUrl  String?                             // URL file đính kèm
+
+  // External IDs (Zalo/Email)
+  externalId     String?          // Zalo message ID
+
+  // Sender info
+  senderId       String?          // userId nếu outbound, null nếu inbound (từ khách)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  readAt     DateTime?
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// =====================
+// AUTOMATION ENGINE (Sprint 8)
+// =====================
+
+/// WorkflowAutomation — quy trình tự động hóa
+model WorkflowAutomation {
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  status         WorkflowStatus @default(DRAFT)
+
+  // Trigger — sự kiện kích hoạt workflow
+  triggerType       TriggerType
+  triggerConditions Json        @default("{}") // Điều kiện lọc thêm, ví dụ: { "stageId": "xxx" }
+
+  // Actions — danh sách hành động sẽ thực thi (theo thứ tự)
+  // Dạng: [{ "type": "SEND_EMAIL", "order": 1, "config": { "templateId": "..." } }]
+  actions Json @default("[]")
+
+  // Stats
+  runCount  Int       @default(0)
+  lastRunAt DateTime?
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  // Relations
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  runs         WorkflowRun[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, triggerType])
+  @@map("workflow_automations")
+}
+
+/// WorkflowRun — lịch sử mỗi lần workflow được chạy
+model WorkflowRun {
+  id         String            @id @default(cuid())
+  workflowId String
+  status     WorkflowRunStatus @default(PENDING)
+
+  // Context — dữ liệu trigger (contactId, dealId, conversationId, ...)
+  triggerData Json @default("{}")
+
+  // Kết quả từng action
+  // [{ "actionIndex": 0, "type": "SEND_EMAIL", "status": "SUCCESS"|"FAILED", "result": {...}, "error": "..." }]
+  actionResults Json @default("[]")
+
+  error       String?   // Thông báo lỗi tổng nếu workflow fail
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Relations
+  workflow WorkflowAutomation @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([workflowId, status])
+  @@index([workflowId, startedAt])
+  @@map("workflow_runs")
+}
+
+// =====================
+// TEAM & PERMISSIONS (Sprint 10)
+// =====================
+
+/// TeamInvitation — lời mời tham gia tổ chức qua email
+model TeamInvitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           UserRole  @default(MEMBER)
+  token          String    @unique // Token bí mật gửi qua email để accept
+  expiresAt      DateTime
+  acceptedAt     DateTime?          // null = chưa chấp nhận
+  revokedAt      DateTime?          // null = chưa thu hồi
+
+  createdAt   DateTime @default(now())
+  invitedById String   // userId người mời
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invitedBy    User          @relation("SentInvitations", fields: [invitedById], references: [id])
+
+  @@unique([organizationId, email])  // 1 email chỉ có 1 lời mời pending mỗi lúc
+  @@index([organizationId])
+  @@index([token])
+  @@map("team_invitations")
+}
+
+// =====================
+// BILLING & SUBSCRIPTION (Sprint 11)
+// =====================
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIALING   // Đang dùng thử
+  ACTIVE     // Đang hoạt động
+  PAST_DUE   // Quá hạn thanh toán
+  CANCELLED  // Đã hủy
+  EXPIRED    // Hết hạn
+}
+
+enum PaymentStatus {
+  PENDING   // Chờ thanh toán
+  PAID      // Đã thanh toán
+  FAILED    // Thất bại
+  REFUNDED  // Đã hoàn tiền
+}
+
+/// Subscription — gói đăng ký của 1 Organization
+model Subscription {
+  id             String             @id @default(cuid())
+  organizationId String             @unique
+  plan           Plan               @default(STARTER)
+  status         SubscriptionStatus @default(TRIALING)
+  billingCycle   BillingCycle       @default(MONTHLY)
+
+  // Ngày hiệu lực
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime?
+
+  // External payment IDs (Stripe / VNPay)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  vnpayOrderId         String?
+
+  // Giá đã áp dụng (tại thời điểm subscribe)
+  priceMonthly Int @default(0) // VND
+  priceYearly  Int @default(0) // VND
+
+  cancelledAt DateTime?
+  cancelReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// BillingHistory — lịch sử thanh toán
+model BillingHistory {
+  id             String        @id @default(cuid())
+  organizationId String
+  plan           Plan
+  billingCycle   BillingCycle
+  amount         Int           // VND
+  status         PaymentStatus @default(PENDING)
+  description    String?
+
+  // External references
+  stripePaymentIntentId String?
+  vnpayTransactionId    String?
+  invoiceUrl            String? // Link PDF invoice
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@map("billing_history")
+}
+
+// =====================
+// NOTIFICATIONS (Sprint 13)
+// =====================
+
+/// Notification — thông báo real-time cho user trong organization
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String           // người nhận
+  type           NotificationType
+  title          String
+  body           String
+  isRead         Boolean          @default(false)
+  readAt         DateTime?
+
+  // Metadata — link đến entity liên quan (tùy type)
+  metadata       Json             @default("{}") // { dealId, contactId, activityId, ... }
+
+  // Audit
+  createdAt DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation("UserNotifications", fields: [userId], references: [id])
+
+  @@index([organizationId, userId])
+  @@index([organizationId, userId, isRead])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
+}
+
+// =====================
+// AUDIT LOGS (Sprint 15)
+// =====================
+
+/// AuditLog — lịch sử hành động của user trong hệ thống
+model AuditLog {
+  id             String      @id @default(cuid())
+  organizationId String
+  userId         String?     // null nếu action từ system/webhook
+  action         AuditAction
+  resource       String      // "contact" | "deal" | "activity" | "workflow" | ...
+  resourceId     String?     // ID của entity bị tác động
+  resourceLabel  String?     // Tên entity để hiển thị (VD: "Nguyễn Văn A")
+  before         Json?       // Snapshot trước khi thay đổi
+  after          Json?       // Snapshot sau khi thay đổi
+  metadata       Json        @default("{}") // Extra context (endpoint, params...)
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime    @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User?        @relation("UserAuditLogs", fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, userId])
+  @@index([organizationId, resource])
+  @@index([organizationId, resourceId])
+  @@map("audit_logs")
+}
+
+// =====================
+// API KEYS & WEBHOOKS (Sprint 16)
+// =====================
+
+enum WebhookEvent {
+  CONTACT_CREATED
+  CONTACT_UPDATED
+  CONTACT_DELETED
+  DEAL_CREATED
+  DEAL_UPDATED
+  DEAL_WON
+  DEAL_LOST
+  DEAL_STAGE_CHANGED
+  ACTIVITY_CREATED
+  ACTIVITY_COMPLETED
+  CONVERSATION_MESSAGE_RECEIVED
+  WORKFLOW_RUN_COMPLETED
+  WORKFLOW_RUN_FAILED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
+/// ApiKey — cho phép third-party tích hợp với FuviAI CRM API
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String                    // Tên mô tả: "Zapier Integration"
+  keyHash        String    @unique         // SHA-256 hash của raw key
+  keyPrefix      String                    // 8 ký tự đầu để identify: "fvk_xxxx"
+  scopes         String[]  @default([])    // ["contacts:read", "deals:write", ...]
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation("CreatedApiKeys", fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+/// WebhookEndpoint — URL nhận event notifications
+model WebhookEndpoint {
+  id             String         @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  url            String
+  secret         String         // HMAC-SHA256 signing secret
+  events         WebhookEvent[]
+  isActive       Boolean        @default(true)
+  lastTriggeredAt DateTime?
+  failureCount   Int            @default(0)  // liên tiếp: > 10 → auto-disable
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  createdBy    User              @relation("CreatedWebhooks", fields: [createdById], references: [id])
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId])
+  @@map("webhook_endpoints")
+}
+
+/// WebhookDelivery — lịch sử mỗi lần gọi webhook
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  organizationId String
+  endpointId     String
+  event          WebhookEvent
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  responseCode   Int?
+  responseBody   String?
+  durationMs     Int?
+  attempt        Int                   @default(1)
+  nextRetryAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  // Relations
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  endpoint     WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, endpointId])
+  @@index([organizationId, createdAt])
+  @@map("webhook_deliveries")
+}

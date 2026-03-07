@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  # ================================
+  # PostgreSQL 16
+  # ================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: fuviai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fuviai
+      POSTGRES_PASSWORD: fuviai_password
+      POSTGRES_DB: fuviai_crm
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fuviai -d fuviai_crm']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================
+  # Redis 7
+  # ================================
+  redis:
+    image: redis:7-alpine
+    container_name: fuviai_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================
+  # MailHog — Test email (local only)
+  # ================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: fuviai_mailhog
+    restart: unless-stopped
+    ports:
+      - '1025:1025'  # SMTP
+      - '8025:8025'  # Web UI
+    environment:
+      MH_STORAGE: maildir
+      MH_MAILDIR_PATH: /tmp/mailhog
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

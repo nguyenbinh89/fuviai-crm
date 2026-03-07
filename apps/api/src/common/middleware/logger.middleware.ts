@@ -1,0 +1,29 @@
+import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
+
+/**
+ * Middleware ghi log mọi HTTP request: method, url, statusCode, thời gian xử lý.
+ * Đăng ký trong AppModule.configure().
+ */
+@Injectable()
+export class LoggerMiddleware implements NestMiddleware {
+  private readonly logger = new Logger('HTTP');
+
+  use(req: Request, res: Response, next: NextFunction) {
+    const { method, originalUrl } = req;
+    const start = Date.now();
+
+    res.on('finish', () => {
+      const ms = Date.now() - start;
+      const { statusCode } = res;
+
+      // Bỏ qua /health để không spam log
+      if (originalUrl.includes('/health')) return;
+
+      const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'log';
+      this.logger[level](`${method} ${originalUrl} ${statusCode} +${ms}ms`);
+    });
+
+    next();
+  }
+}

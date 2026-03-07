@@ -1,0 +1,29 @@
+{
+  "name": "fuviai-crm",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "test:coverage": "turbo run test:coverage",
+    "db:migrate": "pnpm --filter @fuviai/db migrate:dev",
+    "db:migrate:prod": "pnpm --filter @fuviai/db migrate:prod",
+    "db:seed": "pnpm --filter @fuviai/db seed",
+    "db:studio": "pnpm --filter @fuviai/db studio",
+    "db:generate": "pnpm --filter @fuviai/db generate",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
