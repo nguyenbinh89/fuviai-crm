@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Standalone output để đóng gói vào Docker image nhỏ gọn
-  output: 'standalone',
+  // Standalone output chỉ dùng khi build Docker (DOCKER_BUILD=true)
+  ...(process.env.DOCKER_BUILD === 'true' ? { output: 'standalone' } : {}),
 
   // Transpile shared packages từ monorepo
   transpilePackages: ['@fuviai/ui'],
