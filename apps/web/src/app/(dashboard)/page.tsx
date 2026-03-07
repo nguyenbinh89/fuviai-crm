@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
+'use client';
 
-// /dashboard → redirect tạm về contacts (Sprint 2)
+// Trang mặc định của dashboard layout group
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
