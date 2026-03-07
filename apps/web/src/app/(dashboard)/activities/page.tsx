@@ -144,7 +144,7 @@ interface ActivityListViewProps {
 }
 
 function ActivityListView({ activities, isLoading, meta, onEdit }: ActivityListViewProps) {
-  const { filters, setFilter } = useActivitiesStore();
+  const { setFilter } = useActivitiesStore();
 
   if (isLoading) {
     return (

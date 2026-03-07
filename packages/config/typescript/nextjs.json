@@ -9,6 +9,8 @@
     "jsx": "preserve",
     "allowJs": true,
     "noEmit": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "plugins": [{ "name": "next" }]
   }
 }

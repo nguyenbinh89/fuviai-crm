@@ -89,4 +89,7 @@ api.interceptors.response.use(
   },
 );
 
+// Alias để tương thích với các hooks dùng apiClient
+export const apiClient = api;
+
 export default api;
