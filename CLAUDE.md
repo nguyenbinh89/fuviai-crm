@@ -298,8 +298,6 @@ docs: cập nhật API docs cho /contacts endpoint
 
 ---
 
-## 🔗 Links quan trọng
-
 - **Figma Design**: *(link khi có)*
 - **Staging**: https://staging.crm.fuviai.com
 - **Production**: https://crm.fuviai.com

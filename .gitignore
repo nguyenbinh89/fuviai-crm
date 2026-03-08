@@ -45,3 +45,5 @@ packages/db/prisma/*.db
 
 # Misc
 *.pem
+
+.vercel
