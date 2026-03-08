@@ -23,7 +23,7 @@ async function bootstrap() {
 
   // CORS — cho phép Next.js frontend
   app.enableCors({
-    origin: configService.get('FRONTEND_URL', 'http://localhost:3000'),
+    origin: configService.get('FRONTEND_URL', 'http://localhost:3001'),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

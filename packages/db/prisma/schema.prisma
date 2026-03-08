@@ -202,6 +202,7 @@ model Organization {
   contacts       Contact[]
   tags           Tag[]
   pipelines      Pipeline[]
+  pipelineStages PipelineStage[]
   deals          Deal[]
   activities     Activity[]
   notes          Note[]
@@ -226,7 +227,8 @@ model User {
   id             String     @id @default(cuid())
   organizationId String
   email          String
-  passwordHash   String
+  passwordHash   String?    // null nếu đăng nhập bằng Google
+  googleId       String?    // Google OAuth ID
   firstName      String
   lastName       String
   avatarUrl      String?
@@ -260,6 +262,7 @@ model User {
   @@unique([organizationId, email])
   @@index([organizationId])
   @@index([email])
+  @@index([googleId])
   @@map("users")
 }
 
@@ -318,7 +321,7 @@ model Contact {
   tags                ContactTag[]
   deals               Deal[]
   activities          Activity[]
-  notes               Note[]
+  notesList           Note[]
   emailRecipients     EmailCampaignRecipient[]
   conversations       Conversation[]
 
@@ -441,7 +444,7 @@ model Deal {
   contact      Contact?      @relation(fields: [contactId], references: [id])
   assignedTo   User?         @relation("AssignedDeals", fields: [assignedToId], references: [id])
   activities   Activity[]
-  notes        Note[]
+  notesList    Note[]
 
   @@index([organizationId])
   @@index([organizationId, status])

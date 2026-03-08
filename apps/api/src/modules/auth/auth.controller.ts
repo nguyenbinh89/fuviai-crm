@@ -8,7 +8,9 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
   ApiOperation,
@@ -149,5 +151,38 @@ export class AuthController {
   async getMe(@CurrentUser() user: { id: string; organizationId: string }) {
     const result = await this.authService.getMe(user.id, user.organizationId);
     return { data: result };
+  }
+
+  // GET /api/v1/auth/google — bắt đầu Google OAuth flow
+  @Get('google')
+  @Public()
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Đăng nhập bằng Google (redirect đến Google)' })
+  async googleAuth() {
+    // Passport tự động redirect đến Google consent screen
+  }
+
+  // GET /api/v1/auth/google/callback — Google redirect về đây sau khi user đồng ý
+  @Get('google/callback')
+  @Public()
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Google OAuth callback' })
+  async googleCallback(@Req() req: any, @Res() res: any) {
+    if (!req.user) {
+      throw new UnauthorizedException('Xác thực Google thất bại');
+    }
+
+    const tokens = await this.authService.loginWithGoogleUser(
+      req.user,
+      req.ip,
+      req.headers?.['user-agent'],
+    );
+
+    // Set refresh token cookie
+    res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, COOKIE_OPTIONS);
+
+    // Redirect về frontend kèm access token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    res.redirect(`${frontendUrl}/auth/google-callback?token=${tokens.accessToken}`);
   }
 }

@@ -8,9 +8,10 @@ const nextConfig = {
 
   // Tối ưu hình ảnh
   images: {
-    domains: ['localhost', 'crm.fuviai.com'],
+    domains: ['localhost', 'crm.fuviai.com', 'lh3.googleusercontent.com'],
     remotePatterns: [
       { protocol: 'https', hostname: '**.fuviai.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
 

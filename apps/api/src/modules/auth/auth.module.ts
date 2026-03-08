@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 
@@ -20,6 +21,7 @@ import { RolesGuard } from './guards/roles.guard';
     AuthService,
     JwtStrategy,
     JwtRefreshStrategy,
+    GoogleStrategy,
     // Global guards — áp dụng cho toàn bộ app
     {
       provide: APP_GUARD,

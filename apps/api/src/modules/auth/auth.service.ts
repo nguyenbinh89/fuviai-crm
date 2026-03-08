@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import slugify from 'slugify';
+import type { Profile } from 'passport-google-oauth20';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -119,6 +120,11 @@ export class AuthService {
       // Tránh timing attack — vẫn so sánh hash dù không tìm thấy
       await bcrypt.compare(dto.password, '$2b$12$invalidhashforsecurity');
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+
+    // Tài khoản Google-only không thể đăng nhập bằng mật khẩu
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Tài khoản này sử dụng đăng nhập Google. Vui lòng nhấn "Đăng nhập bằng Google".');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
@@ -289,6 +295,86 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  // =====================
+  // GOOGLE OAUTH
+  // =====================
+
+  async validateGoogleUser(profile: Profile) {
+    const email = profile.emails?.[0]?.value;
+    if (!email) {
+      throw new UnauthorizedException('Không thể lấy email từ tài khoản Google');
+    }
+
+    // Tìm user theo googleId hoặc email
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: profile.id }, { email: email.toLowerCase() }],
+        deletedAt: null,
+      },
+    });
+
+    if (user) {
+      // Liên kết googleId nếu chưa có (user đăng ký email trước, giờ dùng Google)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: user.googleId ?? profile.id,
+          avatarUrl: user.avatarUrl ?? profile.photos?.[0]?.value,
+          lastLoginAt: new Date(),
+        },
+      });
+    } else {
+      // Tạo mới org + user từ Google profile
+      const firstName = profile.name?.givenName || 'Người dùng';
+      const lastName = profile.name?.familyName || '';
+      const orgName = `${firstName}${lastName ? ' ' + lastName : ''}'s Organization`;
+      const slug = await this.generateUniqueSlug(orgName);
+
+      user = await this.prisma.$transaction(async (tx) => {
+        const org = await tx.organization.create({
+          data: { name: orgName, slug },
+        });
+
+        return tx.user.create({
+          data: {
+            organizationId: org.id,
+            email: email.toLowerCase(),
+            googleId: profile.id,
+            firstName,
+            lastName,
+            avatarUrl: profile.photos?.[0]?.value,
+            role: 'OWNER',
+          },
+        });
+      });
+    }
+
+    return user;
+  }
+
+  async loginWithGoogleUser(
+    user: { id: string; organizationId: string; email: string; role: string },
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const tokens = await this.generateTokens(
+      user.id,
+      user.organizationId,
+      user.email,
+      user.role,
+    );
+
+    await this.saveRefreshToken(
+      user.id,
+      user.organizationId,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
+
+    return tokens;
   }
 
   // =====================
